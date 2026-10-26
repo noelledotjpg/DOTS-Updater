@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Updater (test)" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="dots.updater.Updater" />
+    <module name="dots-updater.main" />
+    <envs>
+      <env name="INST_DIR" value="$PROJECT_DIR$/fake-instances/updater" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

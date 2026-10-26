@@ -1,0 +1,93 @@
+plugins {
+    id 'java'
+}
+
+group = 'dots.updater'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Minecraft 1.20.1 already ships Gson 2.10 on its classpath, so the jar mod
+    // doesn't need to bundle it: the plain `jar` task only packages our own classes.
+    // `implementation` (rather than compileOnly) also puts Gson on the classpath
+    // when you run Updater from IntelliJ.
+    implementation 'com.google.code.gson:gson:2.10'
+}
+
+// Prism launches 1.20.1 with Java 17, so compile for 17.
+// (IntelliJ: set the Gradle JVM / project SDK to any JDK 17 or newer.)
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+
+// Prism identifies the jar mod by this id. Keep it constant so updating the
+// updater instance later replaces the old jar instead of adding a second one.
+def jarmodUuid = 'c02a493d-bcb9-4e98-a8b0-49da51c52c57'
+
+jar {
+    archiveFileName = "${jarmodUuid}.jar"
+    manifest {
+        attributes 'Main-Class': 'dots.updater.Updater'
+    }
+}
+
+// ---- Prism instance packaging -------------------------------------------------
+
+def instanceBuildDir = layout.buildDirectory.dir('instance')
+
+tasks.register('prepareInstance') {
+    inputs.property('jarmodUuid', jarmodUuid)
+    outputs.dir(instanceBuildDir)
+    doLast {
+        def dir = instanceBuildDir.get().asFile
+        new File(dir, 'patches').mkdirs()
+
+        new File(dir, 'mmc-pack.json').text = """\
+{
+    "components": [
+        { "uid": "net.minecraft", "version": "1.20.1", "important": true },
+        { "uid": "org.multimc.jarmod.${jarmodUuid}", "cachedName": "DOTS updater (jar mod)" }
+    ],
+    "formatVersion": 1
+}
+"""
+        new File(dir, "patches/org.multimc.jarmod.${jarmodUuid}.json").text = """\
+{
+    "formatVersion": 1,
+    "jarMods": [
+        {
+            "MMC-displayname": "DOTS updater",
+            "MMC-filename": "${jarmodUuid}.jar",
+            "MMC-hint": "local",
+            "name": "org.multimc.jarmods:${jarmodUuid}:1"
+        }
+    ],
+    "name": "DOTS updater (jar mod)",
+    "uid": "org.multimc.jarmod.${jarmodUuid}"
+}
+"""
+        new File(dir, 'instance.cfg').text = "[General]\nInstanceType=OneSix\nname=DOTS Updater\niconKey=DOTS\n"
+        new File(dir, '.packignore').text = ".minecraft\nminecraft\n"
+    }
+}
+
+// Run this one: build/distributions/dots-updater-instance.zip is what you import into Prism.
+tasks.register('instanceZip', Zip) {
+    group = 'distribution'
+    description = 'Builds the importable Prism Launcher updater instance.'
+    dependsOn tasks.named('prepareInstance')
+    archiveFileName = 'dots-updater-instance.zip'
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from(instanceBuildDir)
+    from(tasks.named('jar')) {
+        into 'jarmods'
+    }
+    // Prism imports <iconKey>.png from the instance root as the instance icon (iconKey=DOTS).
+    from('src/main/resources/assets/icon.png') {
+        rename { 'DOTS.png' }
+    }
+}

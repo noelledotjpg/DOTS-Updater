@@ -1,0 +1,8 @@
+.gradle/
+build/
+.idea/
+*.iml
+fake-instances/*
+!fake-instances/updater/
+fake-instances/updater/minecraft/*
+!fake-instances/updater/minecraft/.gitkeep
