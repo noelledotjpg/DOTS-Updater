@@ -16,7 +16,8 @@ import java.util.stream.*;
 public class Updater {
     static final String REPO = "noelledotjpg/DOTS-Releases";
     static final String NEW_INSTANCE_NAME = "Minecraft: Disorder of the Stone";
-    static final Pattern ASSET = Pattern.compile(".*\\.mrpack", Pattern.CASE_INSENSITIVE);
+    static final String ICON_FILE = "DOTS-Updater.png";   // iconKey = DOTS-Updater
+    static final Pattern ASSET =Pattern.compile(".*\\.mrpack", Pattern.CASE_INSENSITIVE);
     static final Pattern DOTS_INSTANCE = Pattern.compile(".*\\b(dots|disorder)\\b.*", Pattern.CASE_INSENSITIVE);
     // regex for dots instances
 
@@ -131,10 +132,11 @@ public class Updater {
         try (var in = Updater.class.getResourceAsStream("/assets/template/mmc-pack.json")) {
             Files.copy(in, dir.resolve("mmc-pack.json"));
         }
-        // iconKey=DOTS: install the icon into Prism's icons folder (best effort) so the instance shows it.
+        // iconKey=DOTS-Updater: install the utility's icon into Prism's icons folder (best effort).
+        // Named differently from "DOTS" so it doesn't collide with the modpack's own icon.
         Path icons = instancesDir.getParent() == null ? null : instancesDir.getParent().resolve("icons");
-        if (icons != null && Files.isDirectory(icons) && !Files.exists(icons.resolve("DOTS.png"))) {
-            try (var in = Updater.class.getResourceAsStream("/assets/icon.png")) { Files.copy(in, icons.resolve("DOTS.png")); }
+        if (icons != null && Files.isDirectory(icons) && !Files.exists(icons.resolve(ICON_FILE))) {
+            try (var in = Updater.class.getResourceAsStream("/assets/icon.png")) { Files.copy(in, icons.resolve(ICON_FILE)); }
             catch (Exception ignored) {}
         }
         return dir;
