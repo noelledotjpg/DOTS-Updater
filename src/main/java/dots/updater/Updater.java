@@ -102,9 +102,10 @@ public class Updater {
             result = PackInstaller.install(tmp, instance, game, tag, progress);
             // The modpack ships its own icon.png at the mrpack root: install it as DOTS.png (iconKey=DOTS)
             if (created) {
-                Path icons = instancesDir.getParent() == null ? null : instancesDir.getParent().resolve("icons");
-                if (icons != null && Files.isDirectory(icons))
-                    PackInstaller.extractIcon(tmp, icons.resolve(MODPACK_ICON_FILE));
+                for (Path icons : findIconsDirs(instancesDir)) {
+                    try { Files.createDirectories(icons); } catch (Exception ignored) {}
+                    if (Files.isDirectory(icons)) PackInstaller.extractIcon(tmp, icons.resolve(MODPACK_ICON_FILE));
+                }
             }
         } finally {
             Files.deleteIfExists(tmp);
@@ -143,11 +144,54 @@ public class Updater {
         //   DOTS.png         -> the modpack instance's icon (template iconKey=DOTS); overwritten so a stale
         //                       copy of the utility icon from older updater versions gets replaced
         //   DOTS-Updater.png -> the utility's own icon, named differently so it can't collide with the above
-        Path icons = instancesDir.getParent() == null ? null : instancesDir.getParent().resolve("icons");
-        if (icons != null && Files.isDirectory(icons)) {
-            installIcon("/assets/icon.png", icons.resolve(ICON_FILE), false);
-        }
+        for (Path icons : findIconsDirs(instancesDir))
+            if (Files.isDirectory(icons)) installIcon("/assets/icon.png", icons.resolve(ICON_FILE), false);
         return dir;
+    }
+
+    // Prism's instances folder can live anywhere (e.g. D:\PrismLauncher\instances) while its data folder, which holds
+    // prismlauncher.cfg and icons/, stays elsewhere (e.g. %APPDATA%\PrismLauncher). There can even be more than one
+    // data folder pointing at the same instances folder (a portable copy plus an installed one), and the updater can't
+    // tell which Prism launched it. So return the icons folder of EVERY data folder whose prismlauncher.cfg has an
+    // InstanceDir that resolves to the folder this updater lives in; installing into all of them is harmless.
+    static List<Path> findIconsDirs(Path instancesDir) {
+        java.util.Set<Path> cands = new java.util.LinkedHashSet<>();
+        Path parent = instancesDir.getParent();
+        if (parent != null) cands.add(parent.toAbsolutePath().normalize());       // portable install / default layout
+        String appdata = System.getenv("APPDATA");
+        if (appdata != null && !appdata.isEmpty()) cands.add(Paths.get(appdata, "PrismLauncher").toAbsolutePath().normalize());
+        String xdg = System.getenv("XDG_DATA_HOME");
+        if (xdg != null && !xdg.isEmpty()) cands.add(Paths.get(xdg, "PrismLauncher").toAbsolutePath().normalize());
+        String home = System.getProperty("user.home");
+        if (home != null) {
+            cands.add(Paths.get(home, "AppData", "Roaming", "PrismLauncher").toAbsolutePath().normalize());
+            cands.add(Paths.get(home, ".local", "share", "PrismLauncher").toAbsolutePath().normalize());
+            cands.add(Paths.get(home, "Library", "Application Support", "PrismLauncher").toAbsolutePath().normalize());
+        }
+        Path want = instancesDir.toAbsolutePath().normalize();
+        java.util.Set<Path> matches = new java.util.LinkedHashSet<>();
+        Path fallback = null;
+        for (Path c : cands) {
+            Path cfg = c.resolve("prismlauncher.cfg");
+            if (!Files.isRegularFile(cfg)) continue;
+            String instDir = null, iconsDir = null;
+            try {
+                for (String line : Files.readAllLines(cfg)) {
+                    if (line.startsWith("InstanceDir=")) instDir = line.substring(12).trim();
+                    else if (line.startsWith("IconsDir=")) iconsDir = line.substring(9).trim();
+                }
+            } catch (Exception ignored) {}
+            Path icons = c.resolve(iconsDir != null && !iconsDir.isEmpty() ? iconsDir : "icons").normalize();
+            boolean same = false;
+            try {
+                same = c.resolve(instDir != null && !instDir.isEmpty() ? instDir : "instances").toAbsolutePath().normalize().equals(want);
+            } catch (Exception ignored) {}
+            if (same) matches.add(icons);
+            else if (fallback == null) fallback = icons;
+        }
+        if (!matches.isEmpty()) return new java.util.ArrayList<>(matches);
+        if (fallback != null) return List.of(fallback);
+        return parent == null ? List.of() : List.of(parent.resolve("icons"));      // last resort: old behaviour
     }
 
     private static void installIcon(String resource, Path dest, boolean overwrite) {

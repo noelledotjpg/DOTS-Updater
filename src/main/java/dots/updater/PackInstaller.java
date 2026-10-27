@@ -184,17 +184,22 @@ public final class PackInstaller {
         return new Result(changed, notes);
     }
 
-    // Copies icon.png from the root of the .mrpack to dest (best effort). Returns false if the pack has none.
+    // Copies icon.png from the .mrpack to dest (best effort). Returns false if the pack has none or the copy failed.
     static boolean extractIcon(Path mrpack, Path dest) {
         try (ZipFile zf = new ZipFile(mrpack.toFile())) {
-            ZipEntry e = zf.getEntry("icon.png");                       // same lookup order as Prism:
-            if (e == null) e = zf.getEntry("overrides/icon.png");       // pack root, then overrides/
+            ZipEntry e = null;
+            // Same lookup order as Prism: pack root, then overrides/ (case-insensitive)
+            for (String dir : new String[] { "", "overrides/" })
+                for (Enumeration<? extends ZipEntry> en = zf.entries(); e == null && en.hasMoreElements(); ) {
+                    ZipEntry c = en.nextElement();
+                    if (c.getName().equalsIgnoreCase(dir + "icon.png")) e = c;
+                }
             if (e == null) return false;
             try (InputStream in = zf.getInputStream(e)) {
                 Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
             }
             return true;
-        } catch (IOException ex) { return false; }
+        } catch (Exception ex) { return false; }
     }
 
     static State loadState(Path game) throws IOException {

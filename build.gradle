@@ -42,8 +42,10 @@ def instanceBuildDir = layout.buildDirectory.dir('instance')
 tasks.register('prepareInstance') {
     inputs.property('jarmodUuid', jarmodUuid)
     outputs.dir(instanceBuildDir)
+    outputs.upToDateWhen { false }          // tiny task: always regenerate so edits to the text below are never skipped
     doLast {
         def dir = instanceBuildDir.get().asFile
+        dir.deleteDir()                      // drop anything left over from a previous run
         new File(dir, 'patches').mkdirs()
 
         new File(dir, 'mmc-pack.json').text = """\
@@ -70,7 +72,7 @@ tasks.register('prepareInstance') {
     "uid": "org.multimc.jarmod.${jarmodUuid}"
 }
 """
-        new File(dir, 'instance.cfg').text = "[General]\nInstanceType=OneSix\nname=DOTS Updater\niconKey=DOTS\n"
+        new File(dir, 'instance.cfg').text = "[General]\nInstanceType=OneSix\nname=DOTS Updater\niconKey=DOTS-Updater\n"
         new File(dir, '.packignore').text = ".minecraft\nminecraft\n"
     }
 }
@@ -80,14 +82,15 @@ tasks.register('instanceZip', Zip) {
     group = 'distribution'
     description = 'Builds the importable Prism Launcher updater instance.'
     dependsOn tasks.named('prepareInstance')
+    outputs.upToDateWhen { false }          // always rebuild the zip so it can't be a stale copy
     archiveFileName = 'dots-updater-instance.zip'
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(instanceBuildDir)
     from(tasks.named('jar')) {
         into 'jarmods'
     }
-    // Prism imports <iconKey>.png from the instance root as the instance icon (iconKey=DOTS).
+    // Prism imports <iconKey>.png from the instance root as the instance icon (iconKey=DOTS-Updater).
     from('src/main/resources/assets/icon.png') {
-        rename { 'DOTS.png' }
+        rename { 'DOTS-Updater.png' }
     }
 }
