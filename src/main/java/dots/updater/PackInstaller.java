@@ -184,6 +184,19 @@ public final class PackInstaller {
         return new Result(changed, notes);
     }
 
+    // Copies icon.png from the root of the .mrpack to dest (best effort). Returns false if the pack has none.
+    static boolean extractIcon(Path mrpack, Path dest) {
+        try (ZipFile zf = new ZipFile(mrpack.toFile())) {
+            ZipEntry e = zf.getEntry("icon.png");                       // same lookup order as Prism:
+            if (e == null) e = zf.getEntry("overrides/icon.png");       // pack root, then overrides/
+            if (e == null) return false;
+            try (InputStream in = zf.getInputStream(e)) {
+                Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        } catch (IOException ex) { return false; }
+    }
+
     static State loadState(Path game) throws IOException {
         Path file = game.resolve(STATE_FILE);
         if (Files.exists(file)) {

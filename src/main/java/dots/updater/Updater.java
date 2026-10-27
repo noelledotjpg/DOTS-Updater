@@ -100,6 +100,12 @@ public class Updater {
             progress.status("Downloading pack...", 0);
             PackInstaller.fetch(url, tmp);
             result = PackInstaller.install(tmp, instance, game, tag, progress);
+            // The modpack ships its own icon.png at the mrpack root: install it as DOTS.png (iconKey=DOTS)
+            if (created) {
+                Path icons = instancesDir.getParent() == null ? null : instancesDir.getParent().resolve("icons");
+                if (icons != null && Files.isDirectory(icons))
+                    PackInstaller.extractIcon(tmp, icons.resolve(MODPACK_ICON_FILE));
+            }
         } finally {
             Files.deleteIfExists(tmp);
         }
@@ -139,7 +145,6 @@ public class Updater {
         //   DOTS-Updater.png -> the utility's own icon, named differently so it can't collide with the above
         Path icons = instancesDir.getParent() == null ? null : instancesDir.getParent().resolve("icons");
         if (icons != null && Files.isDirectory(icons)) {
-            installIcon("/assets/dots_icon.png", icons.resolve(MODPACK_ICON_FILE), true);
             installIcon("/assets/icon.png", icons.resolve(ICON_FILE), false);
         }
         return dir;
